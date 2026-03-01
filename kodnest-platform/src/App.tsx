@@ -1798,10 +1798,240 @@ function ResourcesPage() {
   return (
     <div className="text-center py-20">
       <h2 className="text-2xl font-semibold text-gray-900 mb-4">Resources</h2>
-      <p className="text-gray-600">Learning resources coming soon</p>
+      <p className="text-gray resources coming soon-600">Learning</p>
     </div>
   );
 }
+
+// Test Checklist Page
+interface TestItem {
+  id: number;
+  label: string;
+  hint: string;
+}
+
+const TEST_ITEMS: TestItem[] = [
+  { id: 1, label: 'JD required validation works', hint: 'Try submitting empty JD form' },
+  { id: 2, label: 'Short JD warning shows for <200 chars', hint: 'Enter JD with <200 characters' },
+  { id: 3, label: 'Skills extraction groups correctly', hint: 'Analyze JD with React, DSA, SQL' },
+  { id: 4, label: 'Round mapping changes based on company + skills', hint: 'Test with Amazon vs unknown startup' },
+  { id: 5, label: 'Score calculation is deterministic', hint: 'Same input should give same score' },
+  { id: 6, label: 'Skill toggles update score live', hint: 'Toggle skills and watch score change' },
+  { id: 7, label: 'Changes persist after refresh', hint: 'Toggle skills, refresh, verify persisted' },
+  { id: 8, label: 'History saves and loads correctly', hint: 'Analyze JD, check history page' },
+  { id: 9, label: 'Export buttons copy the correct content', hint: 'Click export buttons and paste' },
+  { id: 10, label: 'No console errors on core pages', hint: 'Check browser DevTools console' },
+];
+
+function TestChecklistPage() {
+  const [checkedItems, setCheckedItems] = useState<number[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('testChecklist');
+    if (saved) {
+      try {
+        setCheckedItems(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load checklist');
+      }
+    }
+  }, []);
+
+  const toggleItem = (id: number) => {
+    let newChecked: number[];
+    if (checkedItems.includes(id)) {
+      newChecked = checkedItems.filter(item => item !== id);
+    } else {
+      newChecked = [...checkedItems, id];
+    }
+    setCheckedItems(newChecked);
+    localStorage.setItem('testChecklist', JSON.stringify(newChecked));
+  };
+
+  const resetChecklist = () => {
+    setCheckedItems([]);
+    localStorage.setItem('testChecklist', JSON.stringify([]));
+  };
+
+  const passedCount = checkedItems.length;
+  const allPassed = passedCount === 10;
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-3xl mx-auto">
+        {/* Summary */}
+        <Card className="mb-6">
+          <CardContent className="py-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Tests Passed: {passedCount} / 10
+              </h2>
+              {!allPassed && (
+                <p className="text-amber-600 font-medium">
+                  Fix issues before shipping.
+                </p>
+              )}
+              {allPassed && (
+                <p className="text-green-600 font-medium">
+                  All tests passed! Ready to ship.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Test Items */}
+        <Card className="mb-6">
+          <CardHeader>
+            <h3 className="text-lg font-semibold text-gray-900">Test Checklist</h3>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {TEST_ITEMS.map(item => (
+              <div key={item.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  checked={checkedItems.includes(item.id)}
+                  onChange={() => toggleItem(item.id)}
+                  className="w-5 h-5 mt-0.5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                />
+                <div className="flex-1">
+                  <label className="font-medium text-gray-900 cursor-pointer">
+                    {item.label}
+                  </label>
+                  <p className="text-sm text-gray-500 mt-0.5">How to test: {item.hint}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Actions */}
+        <div className="flex gap-4 justify-center">
+          <button
+            onClick={resetChecklist}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            Reset Checklist
+          </button>
+          <Link
+            to="/prp/08-ship"
+            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+              allPassed
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed pointer-events-none'
+            }`}
+          >
+            Go to Ship
+          </Link>
+        </div>
+
+        {/* Navigation */}
+        <div className="mt-8 text-center">
+          <Link to="/dashboard" className="text-indigo-600 hover:underline">
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Ship Locked Page
+function ShipLockedPage() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <Card className="max-w-md">
+        <CardContent className="py-12 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">🔒</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ship Locked</h2>
+          <p className="text-gray-600 mb-6">
+            Complete all 10 tests before shipping.
+          </p>
+          <Link
+            to="/prp/07-test"
+            className="inline-block px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Go to Tests
+          </Link>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Ship Ready Page
+function ShipReadyPage() {
+  const [checkedItems, setCheckedItems] = useState<number[]>([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const saved = localStorage.getItem('testChecklist');
+    if (saved) {
+      try {
+        setCheckedItems(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load checklist');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (checkedItems.length !== 10) {
+      navigate('/prp/08-ship-locked');
+    }
+  }, [checkedItems, navigate]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center">
+      <Card className="max-w-lg">
+        <CardContent className="py-12 text-center">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-4xl">🚀</span>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Ready to Ship!</h2>
+          <p className="text-gray-600 mb-6">
+            All tests passed. Your Placement Readiness Platform is ready for production.
+          </p>
+          <Link
+            to="/dashboard"
+            className="inline-block px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Go to Dashboard
+          </Link>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Ship Locked Redirector (used in route)
+function ShipLockedRedirect() {
+  const navigate = useNavigate();
+  const [checkedItems, setCheckedItems] = useState<number[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('testChecklist');
+    if (saved) {
+      try {
+        setCheckedItems(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load checklist');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (checkedItems.length === 10) {
+      navigate('/prp/08-ship');
+    }
+  }, [checkedItems, navigate]);
+
+  return <ShipLockedPage />;
+}
+
+// Main App
 
 function ProfilePage() {
   return (
@@ -1829,6 +2059,9 @@ function App() {
           <Route path="/analyze" element={<AnalyzeLayout />} />
           <Route path="/results" element={<ResultsLayout />} />
           <Route path="/history" element={<HistoryLayout />} />
+          <Route path="/prp/07-test" element={<TestChecklistPage />} />
+          <Route path="/prp/08-ship-locked" element={<ShipLockedRedirect />} />
+          <Route path="/prp/08-ship" element={<ShipReadyPage />} />
         </Routes>
       </BrowserRouter>
     </AnalysisProvider>
