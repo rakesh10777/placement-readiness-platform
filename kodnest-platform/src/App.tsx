@@ -30,6 +30,20 @@ interface InterviewQuestion {
   skill: string;
 }
 
+interface CompanyIntel {
+  company: string;
+  industry: string;
+  sizeCategory: 'Startup' | 'Mid-size' | 'Enterprise';
+  hiringFocus: string;
+}
+
+interface RoundMapping {
+  round: number;
+  name: string;
+  description: string;
+  whyItMatters: string;
+}
+
 interface AnalysisEntry {
   id: string;
   createdAt: string;
@@ -42,6 +56,8 @@ interface AnalysisEntry {
   questions: InterviewQuestion[];
   readinessScore: number;
   skillConfidenceMap?: { [skill: string]: 'know' | 'practice' };
+  companyIntel?: CompanyIntel;
+  roundMapping?: RoundMapping[];
 }
 
 interface AnalysisContextType {
@@ -343,6 +359,166 @@ function generateQuestions(skills: ExtractedSkills): InterviewQuestion[] {
   return questions.slice(0, 10);
 }
 
+// Known enterprise companies
+const ENTERPRISE_COMPANIES = [
+  'amazon', 'google', 'microsoft', 'meta', 'apple', 'netflix',
+  'infosys', 'tcs', 'wipro', 'accenture', 'capgemini', 'cognizant',
+  'ibm', 'oracle', 'salesforce', 'adobe', 'intuit', 'uber', 'lyft',
+  'airbnb', 'stripe', 'paypal', 'goldman', 'jp morgan', 'morgan stanley',
+  'flipkart', 'swiggy', 'zomato', 'oyo', 'byju', 'cred', 'razorpay',
+  'dell', 'hp', 'cisco', 'nvidia', 'intel', 'amd', 'qualcomm'
+];
+
+// Company Intel Generation
+function generateCompanyIntel(company: string, jdText: string): CompanyIntel | null {
+  if (!company || company === 'Not specified') return null;
+  
+  const lowerCompany = company.toLowerCase();
+  const lowerJd = jdText.toLowerCase();
+  
+  // Determine company size
+  let sizeCategory: 'Startup' | 'Mid-size' | 'Enterprise' = 'Startup';
+  if (ENTERPRISE_COMPANIES.some(c => lowerCompany.includes(c))) {
+    sizeCategory = 'Enterprise';
+  }
+  
+  // Infer industry from JD keywords
+  let industry = 'Technology Services';
+  if (lowerJd.includes('fintech') || lowerJd.includes('banking') || lowerJd.includes('financial')) {
+    industry = 'Financial Services';
+  } else if (lowerJd.includes('health') || lowerJd.includes('medical') || lowerJd.includes('pharma')) {
+    industry = 'Healthcare Technology';
+  } else if (lowerJd.includes('e-commerce') || lowerJd.includes('retail') || lowerJd.includes('shopping')) {
+    industry = 'E-Commerce';
+  } else if (lowerJd.includes('edtech') || lowerJd.includes('education') || lowerJd.includes('learning')) {
+    industry = 'EdTech';
+  } else if (lowerJd.includes('logistics') || lowerJd.includes('delivery') || lowerJd.includes('supply')) {
+    industry = 'Logistics';
+  }
+  
+  // Hiring focus based on company size
+  const hiringFocus = sizeCategory === 'Enterprise' 
+    ? 'Structured DSA + Core fundamentals + System design + Strong communication'
+    : sizeCategory === 'Startup'
+    ? 'Practical problem solving + Stack depth + Ownership + Fast-paced execution'
+    : 'Practical problem solving + Full-stack capability + Quick learner + Adaptability';
+  
+  return {
+    company,
+    industry,
+    sizeCategory,
+    hiringFocus
+  };
+}
+
+// Round Mapping Generation
+function generateRoundMapping(companyIntel: CompanyIntel | null, skills: ExtractedSkills): RoundMapping[] {
+  const skillKeys = Object.keys(skills).flatMap(k => skills[k] || []);
+  const hasDSA = skillKeys.includes('DSA');
+  const hasReact = skillKeys.some(s => s.includes('React') || s.includes('Node'));
+  const isEnterprise = companyIntel?.sizeCategory === 'Enterprise';
+  
+  // Enterprise + DSA focused
+  if (isEnterprise && hasDSA) {
+    return [
+      {
+        round: 1,
+        name: 'Online Assessment',
+        description: 'DSA + Aptitude + Logical Reasoning',
+        whyItMatters: 'Clears the initial filtering barrier. Strong DSA fundamentals prove problem-solving ability.'
+      },
+      {
+        round: 2,
+        name: 'Technical Interview - DSA',
+        description: 'Live coding on arrays, trees, graphs, dynamic programming',
+        whyItMatters: 'Tests algorithmic thinking and code quality under pressure.'
+      },
+      {
+        round: 3,
+        name: 'Technical Interview - Core CS',
+        description: 'OOP, DBMS, OS, Networks, System Design basics',
+        whyItMatters: 'Validates computer science fundamentals required for the role.'
+      },
+      {
+        round: 4,
+        name: 'Managerial + HR',
+        description: 'Project discussion, leadership, cultural fit',
+        whyItMatters: 'Ensures alignment with team values and growth potential.'
+      }
+    ];
+  }
+  
+  // Startup + React/Node focused
+  if (!isEnterprise && hasReact) {
+    return [
+      {
+        round: 1,
+        name: 'Practical Coding',
+        description: 'Build a small feature or solve real-world problem',
+        whyItMatters: 'Proves you can ship code, not just solve algorithms.'
+      },
+      {
+        round: 2,
+        name: 'System Discussion',
+        description: 'Architecture decisions, trade-offs, scaling considerations',
+        whyItMatters: 'Shows depth in system design and decision making.'
+      },
+      {
+        round: 3,
+        name: 'Culture Fit',
+        description: 'Team价值观, ownership, rapid learning ability',
+        whyItMatters: 'Startup success depends on collaborative, adaptable teammates.'
+      }
+    ];
+  }
+  
+  // Mid-size or default pattern
+  if (hasDSA) {
+    return [
+      {
+        round: 1,
+        name: 'Aptitude + Technical Quiz',
+        description: 'Quantitative + Logical + Domain basics',
+        whyItMatters: 'Tests aptitude and baseline technical knowledge.'
+      },
+      {
+        round: 2,
+        name: 'Technical Interview',
+        description: 'DSA + Core concepts + Project deep-dive',
+        whyItMatters: 'Primary filter for technical competence.'
+      },
+      {
+        round: 3,
+        name: 'HR Interview',
+        description: 'Background, expectations, cultural fit',
+        whyItMatters: 'Final alignment check before offer.'
+      }
+    ];
+  }
+  
+  // Default fallback
+  return [
+    {
+      round: 1,
+      name: 'Screening',
+      description: 'Basic technical questions + Resume review',
+      whyItMatters: 'Initial evaluation of suitability.'
+    },
+    {
+      round: 2,
+      name: 'Technical Round',
+      description: 'Core concepts + Problem solving + Projects',
+      whyItMatters: 'Deep dive into your technical expertise.'
+    },
+    {
+      round: 3,
+      name: 'HR Round',
+      description: 'Fit assessment + Compensation discussion',
+        whyItMatters: 'Final hurdle before offer extension.'
+    }
+  ];
+}
+
 // Context Provider
 function AnalysisProvider({ children }: { children: React.ReactNode }) {
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisEntry | null>(null);
@@ -511,6 +687,8 @@ function AnalyzePage() {
       const plan = generatePlan(extractedSkills);
       const checklist = generateChecklist(extractedSkills);
       const questions = generateQuestions(extractedSkills);
+      const companyIntel = generateCompanyIntel(company, jdText);
+      const roundMapping = generateRoundMapping(companyIntel, extractedSkills);
 
       const entry: AnalysisEntry = {
         id: Date.now().toString(),
@@ -522,7 +700,9 @@ function AnalyzePage() {
         plan,
         checklist,
         questions,
-        readinessScore
+        readinessScore,
+        companyIntel: companyIntel || undefined,
+        roundMapping
       };
 
       addToHistory(entry);
@@ -620,7 +800,7 @@ function ResultsPage() {
     );
   }
 
-  const { extractedSkills, readinessScore: baseScore, plan, checklist, questions, company, role, id } = currentAnalysis;
+  const { extractedSkills, readinessScore: baseScore, plan, checklist, questions, company, role, id, companyIntel, roundMapping } = currentAnalysis;
   
   // Initialize skillConfidenceMap if not present
   const skillConfidenceMap = currentAnalysis.skillConfidenceMap || {};
@@ -663,6 +843,27 @@ function ResultsPage() {
     let content = `PLACEMENT PREPARATION ANALYSIS\n`;
     content += `================================\n\n`;
     content += `Company: ${company}\nRole: ${role}\nReadiness Score: ${liveScore}/100\n\n`;
+    
+    // Add Company Intel
+    if (companyIntel) {
+      content += `COMPANY INTEL\n`;
+      content += `-------------\n`;
+      content += `Company: ${companyIntel.company}\n`;
+      content += `Industry: ${companyIntel.industry}\n`;
+      content += `Size: ${companyIntel.sizeCategory}\n`;
+      content += `Hiring Focus: ${companyIntel.hiringFocus}\n\n`;
+    }
+    
+    // Add Round Mapping
+    if (roundMapping && roundMapping.length > 0) {
+      content += `INTERVIEW ROUND MAPPING\n`;
+      content += `-----------------------\n`;
+      roundMapping.forEach(round => {
+        content += `Round ${round.round}: ${round.name}\n`;
+        content += `  Focus: ${round.description}\n`;
+        content += `  Why: ${round.whyItMatters}\n\n`;
+      });
+    }
     
     content += `SKILLS EXTRACTED\n`;
     content += `----------------\n`;
@@ -751,6 +952,72 @@ function ResultsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Company Intel Block */}
+      {companyIntel && (
+        <Card className="border-indigo-200">
+          <CardHeader>
+            <h3 className="text-lg font-semibold text-gray-900">Company Intel</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <p className="text-xs text-gray-500 uppercase mb-1">Company</p>
+                <p className="font-semibold text-gray-900">{companyIntel.company}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase mb-1">Industry</p>
+                <p className="font-semibold text-gray-900">{companyIntel.industry}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase mb-1">Size Category</p>
+                <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${
+                  companyIntel.sizeCategory === 'Enterprise' ? 'bg-purple-100 text-purple-700' :
+                  companyIntel.sizeCategory === 'Mid-size' ? 'bg-blue-100 text-blue-700' :
+                  'bg-green-100 text-green-700'
+                }`}>
+                  {companyIntel.sizeCategory}
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-500 uppercase mb-1">Typical Hiring Focus</p>
+              <p className="text-sm text-gray-700">{companyIntel.hiringFocus}</p>
+            </div>
+            <p className="text-xs text-gray-400 mt-4 italic">Demo Mode: Company intel generated heuristically.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Round Mapping */}
+      {roundMapping && roundMapping.length > 0 && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold text-gray-900">Interview Round Mapping</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              {roundMapping.map((round, idx) => (
+                <div key={round.round} className="flex gap-4 pb-6 last:pb-0">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-indigo-700 font-semibold">{round.round}</span>
+                    </div>
+                    {idx < roundMapping.length - 1 && (
+                      <div className="w-0.5 h-full bg-indigo-200 absolute top-10 left-5" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900">{round.name}</h4>
+                    <p className="text-sm text-indigo-600 mt-0.5">{round.description}</p>
+                    <p className="text-xs text-gray-500 mt-2 italic">{round.whyItMatters}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Skill Breakdown with Interactive Toggles */}
       <Card>
