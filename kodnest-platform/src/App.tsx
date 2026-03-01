@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, Link } from 'react-router-dom';
 import { Code, Video, TrendingUp, LayoutDashboard, BookOpen, ClipboardCheck, FolderOpen, User, ChevronRight, Plus, History, Trash2, Search, Zap } from 'lucide-react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Radar } from 'recharts';
 import { useState, useEffect, createContext, useContext } from 'react';
@@ -9,38 +9,32 @@ interface SkillCategory {
   skills: string[];
 }
 
+// Standardized extracted skills schema
 interface ExtractedSkills {
-  [category: string]: string[];
+  coreCS: string[];
+  languages: string[];
+  web: string[];
+  data: string[];
+  cloud: string[];
+  testing: string[];
+  other: string[];
 }
 
-interface PreparationPlan {
+// New standardized schema
+interface PlanDay {
   day: number;
   focus: string;
   tasks: string[];
 }
 
 interface ChecklistRound {
-  round: number;
-  name: string;
+  roundTitle: string;
   items: string[];
 }
 
-interface InterviewQuestion {
-  question: string;
-  skill: string;
-}
-
-interface CompanyIntel {
-  company: string;
-  industry: string;
-  sizeCategory: 'Startup' | 'Mid-size' | 'Enterprise';
-  hiringFocus: string;
-}
-
-interface RoundMapping {
-  round: number;
-  name: string;
-  description: string;
+interface RoundMapEntry {
+  roundTitle: string;
+  focusAreas: string[];
   whyItMatters: string;
 }
 
@@ -51,13 +45,16 @@ interface AnalysisEntry {
   role: string;
   jdText: string;
   extractedSkills: ExtractedSkills;
-  plan: PreparationPlan[];
+  roundMapping: RoundMapEntry[];
   checklist: ChecklistRound[];
-  questions: InterviewQuestion[];
-  readinessScore: number;
-  skillConfidenceMap?: { [skill: string]: 'know' | 'practice' };
+  plan7Days: PlanDay[];
+  questions: string[];
+  baseScore: number;
+  skillConfidenceMap: { [skill: string]: 'know' | 'practice' };
+  finalScore: number;
+  updatedAt: string;
   companyIntel?: CompanyIntel;
-  roundMapping?: RoundMapping[];
+  roundMappingLegacy?: RoundMapping[];
 }
 
 interface AnalysisContextType {
@@ -67,54 +64,48 @@ interface AnalysisContextType {
   addToHistory: (entry: AnalysisEntry) => void;
   deleteFromHistory: (id: string) => void;
   updateEntry: (id: string, updates: Partial<AnalysisEntry>) => void;
+  loadError: string | null;
 }
 
 const AnalysisContext = createContext<AnalysisContextType | null>(null);
 
-// Skill Categories
-const SKILL_CATEGORIES: SkillCategory[] = [
-  {
-    name: 'Core CS',
-    skills: ['DSA', 'OOP', 'DBMS', 'OS', 'Networks']
-  },
-  {
-    name: 'Languages',
-    skills: ['Java', 'Python', 'JavaScript', 'TypeScript', 'C\\+\\+', 'C#', 'Go']
-  },
-  {
-    name: 'Web',
-    skills: ['React', 'Next\\.js', 'Node\\.js', 'Express', 'REST', 'GraphQL']
-  },
-  {
-    name: 'Data',
-    skills: ['SQL', 'MongoDB', 'PostgreSQL', 'MySQL', 'Redis']
-  },
-  {
-    name: 'Cloud/DevOps',
-    skills: ['AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'CI/CD', 'Linux']
-  },
-  {
-    name: 'Testing',
-    skills: ['Selenium', 'Cypress', 'Playwright', 'JUnit', 'PyTest']
-  }
+// Skill Categories with schema mapping
+const SKILL_CATEGORIES: { name: string; key: keyof ExtractedSkills; skills: string[] }[] = [
+  { name: 'Core CS', key: 'coreCS', skills: ['DSA', 'OOP', 'DBMS', 'OS', 'Networks'] },
+  { name: 'Languages', key: 'languages', skills: ['Java', 'Python', 'JavaScript', 'TypeScript', 'C\\+\\+', 'C#', 'Go'] },
+  { name: 'Web', key: 'web', skills: ['React', 'Next\\.js', 'Node\\.js', 'Express', 'REST', 'GraphQL'] },
+  { name: 'Data', key: 'data', skills: ['SQL', 'MongoDB', 'PostgreSQL', 'MySQL', 'Redis'] },
+  { name: 'Cloud/DevOps', key: 'cloud', skills: ['AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'CI/CD', 'Linux'] },
+  { name: 'Testing', key: 'testing', skills: ['Selenium', 'Cypress', 'Playwright', 'JUnit', 'PyTest'] },
 ];
 
-// Skill Extraction Logic
+// Skill Extraction Logic - returns standardized schema
 function extractSkills(jdText: string): ExtractedSkills {
   const lowerJd = jdText.toLowerCase();
-  const extracted: ExtractedSkills = {};
+  const extracted: ExtractedSkills = {
+    coreCS: [],
+    languages: [],
+    web: [],
+    data: [],
+    cloud: [],
+    testing: [],
+    other: []
+  };
 
   for (const category of SKILL_CATEGORIES) {
-    const foundSkills: string[] = [];
     for (const skill of category.skills) {
       const pattern = new RegExp(skill, 'gi');
       if (pattern.test(lowerJd)) {
-        foundSkills.push(skill.replace('\\+', '+').replace('\\.js', '.js'));
+        const cleanSkill = skill.replace('\\+', '+').replace('\\.js', '.js');
+        extracted[category.key].push(cleanSkill);
       }
     }
-    if (foundSkills.length > 0) {
-      extracted[category.name] = foundSkills;
-    }
+  }
+
+  // If no skills detected, populate "other" with default fresher skills
+  const totalSkills = Object.keys(extracted).reduce((sum, key) => sum + extracted[key].length, 0);
+  if (totalSkills === 0) {
+    extracted.other = ['Communication', 'Problem solving', 'Basic coding', 'Projects'];
   }
 
   return extracted;
@@ -125,7 +116,7 @@ function calculateReadinessScore(jdText: string, company: string, role: string, 
   let score = 35;
 
   // +5 per detected category (max 30)
-  const categoryCount = Object.keys(skills).length;
+  const categoryCount = Object.keys(skills).filter(k => skills[k].length > 0).length;
   score += Math.min(categoryCount * 5, 30);
 
   // +10 if company provided
@@ -140,9 +131,17 @@ function calculateReadinessScore(jdText: string, company: string, role: string, 
   return Math.min(score, 100);
 }
 
-// Generate Preparation Plan based on skills
-function generatePlan(skills: ExtractedSkills): PreparationPlan[] {
-  const skillKeys = Object.keys(skills).flatMap(k => skills[k] || []);
+// Generate Preparation Plan based on skills - returns new schema
+function generatePlan(skills: ExtractedSkills): PlanDay[] {
+  const skillKeys = [
+    ...skills.coreCS,
+    ...skills.languages,
+    ...skills.web,
+    ...skills.data,
+    ...skills.cloud,
+    ...skills.testing,
+    ...skills.other
+  ];
   const hasReact = skillKeys.some(s => s.includes('React') || s.includes('Node'));
   const hasSQL = skillKeys.some(s => s.includes('SQL') || s.includes('MongoDB'));
   const hasDSA = skillKeys.includes('DSA');
@@ -153,28 +152,36 @@ function generatePlan(skills: ExtractedSkills): PreparationPlan[] {
       focus: 'Basics & Core CS',
       tasks: hasDSA 
         ? ['Revise arrays and strings', 'Practice 5 easy problems', 'Review time complexity']
-        : ['Revise OOP concepts', 'Review DBMS fundamentals', 'Practice SQL queries']
+        : hasSkills(skills)
+          ? ['Revise OOP concepts', 'Review DBMS fundamentals', 'Practice SQL queries']
+          : ['Practice communication', 'Review problem solving basics', 'Prepare self-introduction']
     },
     {
       day: 2,
       focus: 'Core CS Deep Dive',
       tasks: hasDSA
         ? ['Learn linked lists', 'Practice 3 linked list problems', 'Revise stack and queue']
-        : ['Revise OS processes', 'Study memory management', 'Review networking basics']
+        : hasSkills(skills)
+          ? ['Revise OS processes', 'Study memory management', 'Review networking basics']
+          : ['Prepare project portfolio', 'Review coding basics', 'Practice aptitude']
     },
     {
       day: 3,
       focus: 'DSA Practice',
       tasks: hasDSA
         ? ['Learn sorting algorithms', 'Practice binary search', 'Solve 5 medium problems']
-        : ['Skip DSA focus', 'Review system design basics']
+        : hasSkills(skills)
+          ? ['Skip DSA focus', 'Review system design basics']
+          : ['Practice mock interviews', 'Review HR questions', 'Prepare questions for interviewer']
     },
     {
       day: 4,
-      focus: 'Advanced DSA',
+      focus: 'Advanced Topics',
       tasks: hasDSA
         ? ['Learn dynamic programming basics', 'Practice tree traversals', 'Revise graph algorithms']
-        : ['Focus on practical skills', 'Build sample projects']
+        : hasSkills(skills)
+          ? ['Focus on practical skills', 'Build sample projects']
+          : ['Final resume review', 'Research company', 'Relax and stay confident']
     },
     {
       day: 5,
@@ -209,33 +216,42 @@ function generatePlan(skills: ExtractedSkills): PreparationPlan[] {
   ];
 }
 
-// Generate Checklist based on skills
+// Helper to check if any skills detected
+function hasSkills(skills: ExtractedSkills): boolean {
+  return Object.values(skills).some(arr => arr.length > 0);
+}
+
+// Generate Checklist based on skills - returns new schema
 function generateChecklist(skills: ExtractedSkills): ChecklistRound[] {
-  const skillKeys = Object.keys(skills).flatMap(k => skills[k] || []);
+  const skillKeys = [
+    ...skills.coreCS,
+    ...skills.languages,
+    ...skills.web,
+    ...skills.data,
+    ...skills.cloud,
+    ...skills.testing,
+    ...skills.other
+  ];
+  
+  const isEmpty = !hasSkills(skills);
   
   return [
     {
-      round: 1,
-      name: 'Aptitude / Basics',
-      items: [
-        'Quantitative aptitude practice',
-        'Logical reasoning puzzles',
-        'Verbal ability and grammar',
-        'Reading comprehension',
-        'Number systems and percentages',
-        'Time and work problems'
-      ]
+      roundTitle: 'Round 1: Aptitude / Basics',
+      items: isEmpty
+        ? ['Practice quantitative aptitude', 'Practice logical reasoning', 'Prepare verbal ability', 'Review number systems', 'Practice time and work']
+        : ['Quantitative aptitude practice', 'Logical reasoning puzzles', 'Verbal ability and grammar', 'Reading comprehension', 'Number systems and percentages', 'Time and work problems']
     },
     {
-      round: 2,
-      name: 'DSA + Core CS',
+      roundTitle: 'Round 2: DSA + Core CS',
       items: skillKeys.includes('DSA')
         ? ['Arrays and strings', 'Linked lists', 'Trees and graphs', 'Dynamic programming', 'Sorting and searching', 'Stack and queue implementations']
-        : ['OOP principles', 'Database normalization', 'SQL queries', 'Operating system processes', 'Memory management', 'Networking protocols']
+        : isEmpty
+          ? ['OOP principles', 'Database basics', 'SQL fundamentals', 'Project discussion', 'Problem solving approach']
+          : ['OOP principles', 'Database normalization', 'SQL queries', 'Operating system processes', 'Memory management', 'Networking protocols']
     },
     {
-      round: 3,
-      name: 'Tech Interview',
+      roundTitle: 'Round 3: Tech Interview',
       items: [
         ...(skillKeys.includes('React') ? ['React state management', 'Component lifecycle'] : []),
         ...(skillKeys.some(s => s.includes('SQL') || s.includes('MongoDB')) ? ['Database indexing', 'Query optimization', 'ACID properties'] : []),
@@ -246,8 +262,7 @@ function generateChecklist(skills: ExtractedSkills): ChecklistRound[] {
       ].slice(0, 7)
     },
     {
-      round: 4,
-      name: 'Managerial / HR',
+      roundTitle: 'Round 4: Managerial / HR',
       items: [
         'Tell me about yourself',
         'Why this company?',
@@ -261,11 +276,20 @@ function generateChecklist(skills: ExtractedSkills): ChecklistRound[] {
   ];
 }
 
-// Generate Interview Questions based on skills
-function generateQuestions(skills: ExtractedSkills): InterviewQuestion[] {
-  const skillKeys = Object.keys(skills).flatMap(k => skills[k] || []);
-  const questions: InterviewQuestion[] = [];
-
+// Generate Interview Questions based on skills - returns string array
+function generateQuestions(skills: ExtractedSkills): string[] {
+  const skillKeys = [
+    ...skills.coreCS,
+    ...skills.languages,
+    ...skills.web,
+    ...skills.data,
+    ...skills.cloud,
+    ...skills.testing,
+    ...skills.other
+  ];
+  
+  const questions: string[] = [];
+  
   const skillQuestions: { [key: string]: string[] } = {
     'DSA': [
       'How would you optimize search in sorted data?',
@@ -353,7 +377,7 @@ function generateQuestions(skills: ExtractedSkills): InterviewQuestion[] {
 
   while (questions.length < 10) {
     const idx = questions.length % genericQuestions.length;
-    questions.push({ question: genericQuestions[idx], skill: 'General' });
+    questions.push(genericQuestions[idx]);
   }
 
   return questions.slice(0, 10);
@@ -519,18 +543,34 @@ function generateRoundMapping(companyIntel: CompanyIntel | null, skills: Extract
   ];
 }
 
-// Context Provider
+// Context Provider with localStorage robustness
 function AnalysisProvider({ children }: { children: React.ReactNode }) {
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisEntry | null>(null);
   const [history, setHistory] = useState<AnalysisEntry[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Validate entry has required fields
+  const isValidEntry = (entry: unknown): entry is AnalysisEntry => {
+    if (!entry || typeof entry !== 'object') return false;
+    const e = entry as Record<string, unknown>;
+    return typeof e.id === 'string' && typeof e.createdAt === 'string';
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('placementPrepHistory');
     if (saved) {
       try {
-        setHistory(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const validEntries = parsed.filter(isValidEntry);
+          if (validEntries.length < parsed.length) {
+            setLoadError('One saved entry couldn\'t be loaded. Create a new analysis.');
+          }
+          setHistory(validEntries);
+        }
       } catch (e) {
         console.error('Failed to parse history:', e);
+        setLoadError('One saved entry couldn\'t be loaded. Create a new analysis.');
       }
     }
   }, []);
@@ -549,19 +589,19 @@ function AnalysisProvider({ children }: { children: React.ReactNode }) {
 
   const updateEntry = (id: string, updates: Partial<AnalysisEntry>) => {
     const newHistory = history.map(entry => 
-      entry.id === id ? { ...entry, ...updates } : entry
+      entry.id === id ? { ...entry, ...updates, updatedAt: new Date().toISOString() } : entry
     );
     setHistory(newHistory);
     localStorage.setItem('placementPrepHistory', JSON.stringify(newHistory));
     
     // Also update currentAnalysis if it matches
     if (currentAnalysis?.id === id) {
-      setCurrentAnalysis({ ...currentAnalysis, ...updates });
+      setCurrentAnalysis({ ...currentAnalysis, ...updates, updatedAt: new Date().toISOString() });
     }
   };
 
   return (
-    <AnalysisContext.Provider value={{ currentAnalysis, setCurrentAnalysis, history, addToHistory, deleteFromHistory, updateEntry }}>
+    <AnalysisContext.Provider value={{ currentAnalysis, setCurrentAnalysis, history, addToHistory, deleteFromHistory, updateEntry, loadError }}>
       {children}
     </AnalysisContext.Provider>
   );
@@ -633,20 +673,17 @@ function CircularProgress({ value, max }: { value: number; max: number }) {
 
 // Skill Radar Chart
 function SkillRadarChart({ skills }: { skills: ExtractedSkills }) {
-  const radarData = Object.entries(skills).map(([category, skillList]) => ({
-    skill: category,
-    value: Math.min(skillList.length * 25, 100),
-    fullMark: 100
-  }));
+  const radarData = [
+    { skill: 'Core CS', value: Math.min(skills.coreCS.length * 25, 100), fullMark: 100 },
+    { skill: 'Languages', value: Math.min(skills.languages.length * 25, 100), fullMark: 100 },
+    { skill: 'Web', value: Math.min(skills.web.length * 25, 100), fullMark: 100 },
+    { skill: 'Data', value: Math.min(skills.data.length * 25, 100), fullMark: 100 },
+    { skill: 'Cloud', value: Math.min(skills.cloud.length * 25, 100), fullMark: 100 }
+  ];
 
-  if (radarData.length === 0) {
-    radarData.push(
-      { skill: 'Core CS', value: 25, fullMark: 100 },
-      { skill: 'Languages', value: 25, fullMark: 100 },
-      { skill: 'Web', value: 25, fullMark: 100 },
-      { skill: 'Data', value: 25, fullMark: 100 },
-      { skill: 'Cloud', value: 25, fullMark: 100 }
-    );
+  const hasSkills = radarData.some(d => d.value > 0);
+  if (!hasSkills) {
+    radarData.forEach(d => d.value = 25);
   }
 
   return (
@@ -661,7 +698,7 @@ function SkillRadarChart({ skills }: { skills: ExtractedSkills }) {
   );
 }
 
-// Analyze Page
+// Analyze Page with validation
 function AnalyzePage() {
   const navigate = useNavigate();
   const { addToHistory, setCurrentAnalysis } = useAnalysis();
@@ -669,38 +706,59 @@ function AnalyzePage() {
   const [role, setRole] = useState('');
   const [jdText, setJdText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [validationWarning, setValidationWarning] = useState<string | null>(null);
 
   const handleAnalyze = () => {
     if (!jdText.trim()) return;
+
+    // Validate JD length
+    if (jdText.trim().length < 200) {
+      setValidationWarning('This JD is too short to analyze deeply. Paste full JD for better output.');
+    } else {
+      setValidationWarning(null);
+    }
 
     setIsAnalyzing(true);
 
     setTimeout(() => {
       const extractedSkills = extractSkills(jdText);
       
-      // Show "General fresher stack" if no skills detected
-      if (Object.keys(extractedSkills).length === 0) {
-        extractedSkills['General'] = ['Problem Solving', 'Communication', 'Basic Programming'];
-      }
-
-      const readinessScore = calculateReadinessScore(jdText, company, role, extractedSkills);
-      const plan = generatePlan(extractedSkills);
+      const baseScore = calculateReadinessScore(jdText, company, role, extractedSkills);
+      const plan7Days = generatePlan(extractedSkills);
       const checklist = generateChecklist(extractedSkills);
       const questions = generateQuestions(extractedSkills);
       const companyIntel = generateCompanyIntel(company, jdText);
-      const roundMapping = generateRoundMapping(companyIntel, extractedSkills);
+      const roundMappingLegacy = generateRoundMapping(companyIntel, extractedSkills);
+      
+      // Build skillConfidenceMap - default all to "practice"
+      const skillConfidenceMap: { [skill: string]: 'know' | 'practice' } = {};
+      Object.values(extractedSkills).forEach(skills => {
+        skills.forEach(skill => {
+          skillConfidenceMap[skill] = 'practice';
+        });
+      });
+
+      // Map legacy roundMapping to new format
+      const roundMapping: RoundMapEntry[] = roundMappingLegacy.map(r => ({
+        roundTitle: `Round ${r.round}: ${r.name}`,
+        focusAreas: r.description.split(', '),
+        whyItMatters: r.whyItMatters
+      }));
 
       const entry: AnalysisEntry = {
         id: Date.now().toString(),
         createdAt: new Date().toISOString(),
-        company: company || 'Not specified',
-        role: role || 'Not specified',
+        updatedAt: new Date().toISOString(),
+        company: company || '',
+        role: role || '',
         jdText,
         extractedSkills,
-        plan,
+        plan7Days,
         checklist,
         questions,
-        readinessScore,
+        baseScore,
+        finalScore: baseScore,
+        skillConfidenceMap,
         companyIntel: companyIntel || undefined,
         roundMapping
       };
@@ -745,15 +803,23 @@ function AnalyzePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Job Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Job Description *</label>
             <textarea
               value={jdText}
-              onChange={(e) => setJdText(e.target.value)}
+              onChange={(e) => {
+                setJdText(e.target.value);
+                setValidationWarning(null);
+              }}
               placeholder="Paste the job description here..."
               rows={12}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none"
             />
-            <p className="text-sm text-gray-500 mt-2">{jdText.length} characters</p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-sm text-gray-500">{jdText.length} characters</p>
+              {validationWarning && (
+                <p className="text-sm text-amber-600">{validationWarning}</p>
+              )}
+            </div>
           </div>
 
           <button
@@ -800,12 +866,25 @@ function ResultsPage() {
     );
   }
 
-  const { extractedSkills, readinessScore: baseScore, plan, checklist, questions, company, role, id, companyIntel, roundMapping } = currentAnalysis;
+  // Handle both legacy and new schema
+  const { 
+    extractedSkills, 
+    baseScore = currentAnalysis.readinessScore || 50, 
+    finalScore = currentAnalysis.readinessScore || 50,
+    plan7Days = currentAnalysis.plan || [],
+    checklist = currentAnalysis.checklistLegacy || [],
+    questions = currentAnalysis.questions || [],
+    company = currentAnalysis.company || 'Not specified', 
+    role = currentAnalysis.role || 'Not specified', 
+    id, 
+    companyIntel, 
+    roundMapping = currentAnalysis.roundMapping || []
+  } = currentAnalysis;
   
   // Initialize skillConfidenceMap if not present
   const skillConfidenceMap = currentAnalysis.skillConfidenceMap || {};
   
-  // Calculate live readiness score
+  // Calculate live readiness score from baseScore
   const calculateLiveScore = () => {
     let score = baseScore;
     Object.values(skillConfidenceMap).forEach(confidence => {
@@ -818,18 +897,27 @@ function ResultsPage() {
   const liveScore = calculateLiveScore();
 
   // Get all skills as flat array
-  const allSkills = Object.entries(extractedSkills).flatMap(([category, skills]) => 
-    skills.map(skill => ({ skill, category, confidence: skillConfidenceMap[skill] || 'practice' }))
-  );
+  const allSkills = (
+    [
+      ...extractedSkills.coreCS.map(s => ({ skill: s, category: 'Core CS' })),
+      ...extractedSkills.languages.map(s => ({ skill: s, category: 'Languages' })),
+      ...extractedSkills.web.map(s => ({ skill: s, category: 'Web' })),
+      ...extractedSkills.data.map(s => ({ skill: s, category: 'Data' })),
+      ...extractedSkills.cloud.map(s => ({ skill: s, category: 'Cloud' })),
+      ...extractedSkills.testing.map(s => ({ skill: s, category: 'Testing' })),
+      ...extractedSkills.other.map(s => ({ skill: s, category: 'Other' }))
+    ]
+  ).map(s => ({ ...s, confidence: skillConfidenceMap[s.skill] || 'practice' }));
 
   // Get weak skills (marked as practice)
   const weakSkills = allSkills.filter(s => s.confidence === 'practice').slice(0, 3);
 
   const handleSkillToggle = (skill: string, confidence: 'know' | 'practice') => {
     const newMap = { ...skillConfidenceMap, [skill]: confidence };
+    const newScore = calculateLiveScore();
     updateEntry(id, { 
       skillConfidenceMap: newMap,
-      readinessScore: calculateLiveScore()
+      finalScore: newScore
     });
   };
 
@@ -842,7 +930,7 @@ function ResultsPage() {
   const exportAsTxt = () => {
     let content = `PLACEMENT PREPARATION ANALYSIS\n`;
     content += `================================\n\n`;
-    content += `Company: ${company}\nRole: ${role}\nReadiness Score: ${liveScore}/100\n\n`;
+    content += `Company: ${company}\nRole: ${role}\nBase Score: ${baseScore}\nFinal Score: ${liveScore}\n\n`;
     
     // Add Company Intel
     if (companyIntel) {
@@ -858,23 +946,26 @@ function ResultsPage() {
     if (roundMapping && roundMapping.length > 0) {
       content += `INTERVIEW ROUND MAPPING\n`;
       content += `-----------------------\n`;
-      roundMapping.forEach(round => {
-        content += `Round ${round.round}: ${round.name}\n`;
-        content += `  Focus: ${round.description}\n`;
+      roundMapping.forEach((round, idx) => {
+        content += `${round.roundTitle}\n`;
+        content += `  Focus: ${round.focusAreas.join(', ')}\n`;
         content += `  Why: ${round.whyItMatters}\n\n`;
       });
     }
     
     content += `SKILLS EXTRACTED\n`;
     content += `----------------\n`;
-    Object.entries(extractedSkills).forEach(([category, skills]) => {
-      content += `${category}: ${skills.join(', ')}\n`;
-    });
-    content += `\n`;
+    content += `Core CS: ${extractedSkills.coreCS.join(', ')}\n`;
+    content += `Languages: ${extractedSkills.languages.join(', ')}\n`;
+    content += `Web: ${extractedSkills.web.join(', ')}\n`;
+    content += `Data: ${extractedSkills.data.join(', ')}\n`;
+    content += `Cloud/DevOps: ${extractedSkills.cloud.join(', ')}\n`;
+    content += `Testing: ${extractedSkills.testing.join(', ')}\n`;
+    content += `Other: ${extractedSkills.other.join(', ')}\n\n`;
     
     content += `7-DAY PREPARATION PLAN\n`;
     content += `----------------------\n`;
-    plan.forEach(day => {
+    plan7Days.forEach(day => {
       content += `Day ${day.day}: ${day.focus}\n`;
       day.tasks.forEach(task => content += `  - ${task}\n`);
       content += `\n`;
@@ -883,14 +974,14 @@ function ResultsPage() {
     content += `PREPARATION CHECKLIST\n`;
     content += `---------------------\n`;
     checklist.forEach(round => {
-      content += `Round ${round.round}: ${round.name}\n`;
+      content += `${round.roundTitle}\n`;
       round.items.forEach(item => content += `  □ ${item}\n`);
       content += `\n`;
     });
     
     content += `LIKELY INTERVIEW QUESTIONS\n`;
     content += `-------------------------\n`;
-    questions.forEach((q, idx) => content += `${idx + 1}. ${q.question} (${q.skill})\n`);
+    questions.forEach((q, idx) => content += `${idx + 1}. ${q}\n`);
     
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -904,7 +995,7 @@ function ResultsPage() {
   const getPlanText = () => {
     let text = `7-DAY PREPARATION PLAN\n`;
     text += `----------------------\n`;
-    plan.forEach(day => {
+    plan7Days.forEach(day => {
       text += `Day ${day.day}: ${day.focus}\n`;
       day.tasks.forEach(task => text += `  - ${task}\n`);
       text += `\n`;
@@ -916,7 +1007,7 @@ function ResultsPage() {
     let text = `PREPARATION CHECKLIST\n`;
     text += `---------------------\n`;
     checklist.forEach(round => {
-      text += `Round ${round.round}: ${round.name}\n`;
+      text += `${round.roundTitle}\n`;
       round.items.forEach(item => text += `□ ${item}\n`);
       text += `\n`;
     });
@@ -926,7 +1017,7 @@ function ResultsPage() {
   const getQuestionsText = () => {
     let text = `LIKELY INTERVIEW QUESTIONS\n`;
     text += `-------------------------\n`;
-    questions.forEach((q, idx) => text += `${idx + 1}. ${q.question} (${q.skill})\n`);
+    questions.forEach((q, idx) => text += `${idx + 1}. ${q}\n`);
     return text;
   };
 
@@ -998,18 +1089,18 @@ function ResultsPage() {
           <CardContent>
             <div className="relative">
               {roundMapping.map((round, idx) => (
-                <div key={round.round} className="flex gap-4 pb-6 last:pb-0">
+                <div key={round.roundTitle} className="flex gap-4 pb-6 last:pb-0">
                   <div className="flex flex-col items-center">
                     <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-indigo-700 font-semibold">{round.round}</span>
+                      <span className="text-indigo-700 font-semibold">{idx + 1}</span>
                     </div>
                     {idx < roundMapping.length - 1 && (
                       <div className="w-0.5 h-full bg-indigo-200 absolute top-10 left-5" />
                     )}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{round.name}</h4>
-                    <p className="text-sm text-indigo-600 mt-0.5">{round.description}</p>
+                    <h4 className="font-medium text-gray-900">{round.roundTitle}</h4>
+                    <p className="text-sm text-indigo-600 mt-0.5">{round.focusAreas.join(', ')}</p>
                     <p className="text-xs text-gray-500 mt-2 italic">{round.whyItMatters}</p>
                   </div>
                 </div>
@@ -1027,34 +1118,144 @@ function ResultsPage() {
         <CardContent>
           <SkillRadarChart skills={extractedSkills} />
           <div className="mt-6 space-y-4">
-            {Object.entries(extractedSkills).map(([category, skills]) => (
-              <div key={category}>
-                <span className="text-xs font-medium text-gray-500 uppercase">{category}:</span>
+            {extractedSkills.coreCS.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 uppercase">Core CS:</span>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {skills.map(skill => {
+                  {extractedSkills.coreCS.map(skill => {
                     const confidence = skillConfidenceMap[skill] || 'practice';
                     return (
-                      <div key={skill} className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleSkillToggle(skill, confidence === 'know' ? 'practice' : 'know')}
-                          className={`px-3 py-1.5 text-xs rounded-full transition-all flex items-center gap-1.5 ${
-                            confidence === 'know' 
-                              ? 'bg-green-100 text-green-700 border border-green-200' 
-                              : 'bg-amber-100 text-amber-700 border border-amber-200'
-                          }`}
-                        >
-                          {confidence === 'know' ? (
-                            <>✓ I know this</>
-                          ) : (
-                            <>○ Need practice</>
-                          )}
-                        </button>
-                      </div>
+                      <button
+                        key={skill}
+                        onClick={() => handleSkillToggle(skill, confidence === 'know' ? 'practice' : 'know')}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          confidence === 'know' 
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {confidence === 'know' ? '✓ I know this' : '○ Need practice'}
+                      </button>
                     );
                   })}
                 </div>
               </div>
-            ))}
+            )}
+            {extractedSkills.languages.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 uppercase">Languages:</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {extractedSkills.languages.map(skill => {
+                    const confidence = skillConfidenceMap[skill] || 'practice';
+                    return (
+                      <button
+                        key={skill}
+                        onClick={() => handleSkillToggle(skill, confidence === 'know' ? 'practice' : 'know')}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          confidence === 'know' 
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {confidence === 'know' ? '✓ I know this' : '○ Need practice'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {extractedSkills.web.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 uppercase">Web:</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {extractedSkills.web.map(skill => {
+                    const confidence = skillConfidenceMap[skill] || 'practice';
+                    return (
+                      <button
+                        key={skill}
+                        onClick={() => handleSkillToggle(skill, confidence === 'know' ? 'practice' : 'know')}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          confidence === 'know' 
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {confidence === 'know' ? '✓ I know this' : '○ Need practice'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {extractedSkills.data.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 uppercase">Data:</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {extractedSkills.data.map(skill => {
+                    const confidence = skillConfidenceMap[skill] || 'practice';
+                    return (
+                      <button
+                        key={skill}
+                        onClick={() => handleSkillToggle(skill, confidence === 'know' ? 'practice' : 'know')}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          confidence === 'know' 
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {confidence === 'know' ? '✓ I know this' : '○ Need practice'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {extractedSkills.cloud.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 uppercase">Cloud/DevOps:</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {extractedSkills.cloud.map(skill => {
+                    const confidence = skillConfidenceMap[skill] || 'practice';
+                    return (
+                      <button
+                        key={skill}
+                        onClick={() => handleSkillToggle(skill, confidence === 'know' ? 'practice' : 'know')}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          confidence === 'know' 
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {confidence === 'know' ? '✓ I know this' : '○ Need practice'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {extractedSkills.other.length > 0 && (
+              <div>
+                <span className="text-xs font-medium text-gray-500 uppercase">Other:</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {extractedSkills.other.map(skill => {
+                    const confidence = skillConfidenceMap[skill] || 'practice';
+                    return (
+                      <button
+                        key={skill}
+                        onClick={() => handleSkillToggle(skill, confidence === 'know' ? 'practice' : 'know')}
+                        className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                          confidence === 'know' 
+                            ? 'bg-green-100 text-green-700 border border-green-200' 
+                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {confidence === 'know' ? '✓ I know this' : '○ Need practice'}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1094,7 +1295,7 @@ function ResultsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {plan.map(day => (
+            {plan7Days.map(day => (
               <div key={day.day} className="flex gap-4">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-indigo-700 font-semibold">{day.day}</span>
@@ -1122,12 +1323,12 @@ function ResultsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {checklist.map(round => (
-              <div key={round.round}>
-                <h4 className="font-medium text-gray-900 mb-2">Round {round.round}: {round.name}</h4>
+            {checklist.map((round, idx) => (
+              <div key={idx}>
+                <h4 className="font-medium text-gray-900 mb-2">{round.roundTitle}</h4>
                 <div className="space-y-2">
-                  {round.items.map((item, idx) => (
-                    <label key={idx} className="flex items-center gap-3 cursor-pointer">
+                  {round.items.map((item, i) => (
+                    <label key={i} className="flex items-center gap-3 cursor-pointer">
                       <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
                       <span className="text-sm text-gray-700">{item}</span>
                     </label>
@@ -1152,8 +1353,7 @@ function ResultsPage() {
                   <span className="text-indigo-700 text-sm font-medium">{idx + 1}</span>
                 </div>
                 <div>
-                  <p className="text-gray-900">{q.question}</p>
-                  <span className="text-xs text-indigo-600 mt-1 inline-block">{q.skill}</span>
+                  <p className="text-gray-900">{q}</p>
                 </div>
               </div>
             ))}
@@ -1195,7 +1395,7 @@ function ResultsPage() {
 
 // History Page
 function HistoryPage() {
-  const { history, deleteFromHistory, setCurrentAnalysis } = useAnalysis();
+  const { history, deleteFromHistory, setCurrentAnalysis, loadError } = useAnalysis();
   const navigate = useNavigate();
 
   const handleViewResult = (entry: AnalysisEntry) => {
@@ -1209,6 +1409,12 @@ function HistoryPage() {
         <h2 className="text-2xl font-bold text-gray-900">Analysis History</h2>
         <p className="text-gray-500">View your previous job description analyses</p>
       </div>
+
+      {loadError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-700 text-sm">
+          {loadError}
+        </div>
+      )}
 
       {history.length === 0 ? (
         <Card>
@@ -1234,8 +1440,8 @@ function HistoryPage() {
                       <Zap className="w-6 h-6 text-indigo-600" />
                     </div>
                     <div>
-                      <h3 className="font-medium text-gray-900">{entry.company}</h3>
-                      <p className="text-sm text-gray-500">{entry.role}</p>
+                      <h3 className="font-medium text-gray-900">{entry.company || 'Not specified'}</h3>
+                      <p className="text-sm text-gray-500">{entry.role || 'Not specified'}</p>
                       <p className="text-xs text-gray-400 mt-1">
                         {new Date(entry.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
@@ -1250,7 +1456,7 @@ function HistoryPage() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-indigo-600">{entry.readinessScore}</div>
+                    <div className="text-2xl font-bold text-indigo-600">{entry.finalScore || entry.baseScore || 50}</div>
                     <div className="text-xs text-gray-500">Score</div>
                   </div>
                   <button
@@ -1396,7 +1602,7 @@ function DashboardPage() {
             <h3 className="text-lg font-semibold text-gray-900">Skill Breakdown</h3>
           </CardHeader>
           <CardContent>
-            <SkillRadarChart skills={{ 'DSA': ['Arrays', 'Trees'], 'Web': ['React', 'Node'], 'Data': ['SQL'] }} />
+            <SkillRadarChart skills={{ coreCS: ['DSA', 'OOP'], languages: ['Java'], web: ['React', 'Node'], data: ['SQL'], cloud: [], testing: [], other: [] }} />
           </CardContent>
         </Card>
 
@@ -1412,8 +1618,6 @@ function DashboardPage() {
 }
 
 function LandingPage() {
-  const navigate = useNavigate();
-
   return (
     <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-indigo-50 to-white py-24">
@@ -1422,9 +1626,9 @@ function LandingPage() {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Practice, assess, and prepare for your dream job
           </p>
-          <button onClick={() => navigate('/dashboard')} className="bg-[hsl(245,58%,51%)] hover:bg-[hsl(245,58%,45%)] text-white px-8 py-3 rounded-lg font-medium transition-colors">
+          <Link to="/dashboard" className="bg-[hsl(245,58%,51%)] hover:bg-[hsl(245,58%,45%)] text-white px-8 py-3 rounded-lg font-medium transition-colors inline-block">
             Get Started
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -1490,14 +1694,14 @@ function Sidebar() {
       
       <nav className="space-y-1">
         {navItems.map((item) => (
-          <a
+          <Link
             key={item.path}
-            href={item.path}
+            to={item.path}
             className="flex items-center gap-3 px-4 py-3 text-white/80 hover:bg-white/10 rounded-lg transition-colors"
           >
             <item.icon className="w-5 h-5" />
             <span>{item.label}</span>
-          </a>
+          </Link>
         ))}
       </nav>
     </aside>
