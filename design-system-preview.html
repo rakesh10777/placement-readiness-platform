@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KodNest Premium Build System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    /* Demo page specific styles */
+    .demo-section {
+      margin-bottom: var(--space-lg);
+    }
+    
+    .demo-section__title {
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-muted);
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-sm);
+    }
+    
+    /* Preview components */
+    .preview-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: var(--space-md);
+      background: #FFFFFF;
+    }
+    
+    .preview-card__label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-muted);
+      margin-bottom: var(--space-xs);
+    }
+    
+    /* Color swatches */
+    .color-swatches {
+      display: flex;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+    }
+    
+    .color-swatch {
+      width: 120px;
+      text-align: center;
+    }
+    
+    .color-swatch__sample {
+      height: 80px;
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      border: 1px solid var(--color-border);
+    }
+    
+    .color-swatch__name {
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    .color-swatch__hex {
+      font-size: 12px;
+      color: var(--color-muted);
+      font-family: monospace;
+    }
+    
+    /* Typography samples */
+    .type-sample {
+      margin-bottom: var(--space-md);
+    }
+    
+    .type-sample__label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-muted);
+      margin-bottom: 4px;
+    }
+    
+    /* Spacing scale visualization */
+    .spacing-scale {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 100px;
+      padding: var(--space-sm);
+      background: #FFFFFF;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+    }
+    
+    .spacing-block {
+      background: var(--color-accent);
+      width: 24px;
+      border-radius: 2px;
+    }
+    
+    /* Button showcase */
+    .button-showcase {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- TOP BAR -->
+  <header class="top-bar">
+    <div class="top-bar__brand">KodNest Premium Build</div>
+    <div class="top-bar__progress">Step 2 / 5</div>
+    <div class="top-bar__status top-bar__status--in-progress">In Progress</div>
+  </header>
+
+  <!-- CONTEXT HEADER -->
+  <section class="context-header">
+    <div class="container">
+      <h1 class="context-header__headline">Design System Preview</h1>
+      <p class="context-header__subtext">A comprehensive showcase of the KodNest Premium Build System design language. Every component follows a calm, intentional, and coherent approach.</p>
+    </div>
+  </section>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+    <div class="container">
+      <div class="main-layout">
+        
+        <!-- PRIMARY WORKSPACE -->
+        <div class="main-layout__primary">
+          
+          <!-- Color System -->
+          <section class="demo-section">
+            <h2 class="demo-section__title">Color System</h2>
+            <div class="color-swatches">
+              <div class="color-swatch">
+                <div class="color-swatch__sample" style="background: #F7F6F3;"></div>
+                <div class="color-swatch__name">Background</div>
+                <div class="color-swatch__hex">#F7F6F3</div>
+              </div>
+              <div class="color-swatch">
+                <div class="color-swatch__sample" style="background: #111111;"></div>
+                <div class="color-swatch__name">Primary Text</div>
+                <div class="color-swatch__hex">#111111</div>
+              </div>
+              <div class="color-swatch">
+                <div class="color-swatch__sample" style="background: #8B0000;"></div>
+                <div class="color-swatch__name">Accent</div>
+                <div class="color-swatch__hex">#8B0000</div>
+              </div>
+              <div class="color-swatch">
+                <div class="color-swatch__sample" style="background: #2E5A3C;"></div>
+                <div class="color-swatch__name">Success</div>
+                <div class="color-swatch__hex">#2E5A3C</div>
+              </div>
+              <div class="color-swatch">
+                <div class="color-swatch__sample" style="background: #B8860B;"></div>
+                <div class="color-swatch__name">Warning</div>
+                <div class="color-swatch__hex">#B8860B</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Typography -->
+          <section class="demo-section">
+            <h2 class="demo-section__title">Typography</h2>
+            <div class="type-sample">
+              <div class="type-sample__label">Heading 1 — Playfair Display, 48px</div>
+              <h1>The quick brown fox</h1>
+            </div>
+            <div class="type-sample">
+              <div class="type-sample__label">Heading 2 — Playfair Display, 32px</div>
+              <h2>Jumps over the lazy dog</h2>
+            </div>
+            <div class="type-sample">
+              <div class="type-sample__label">Heading 3 — Playfair Display, 24px</div>
+              <h3>Pack my box with five dozen</h3>
+            </div>
+            <div class="type-sample">
+              <div class="type-sample__label">Body — Inter, 17px, line-height 1.7</div>
+              <p>Quality is not an act, it is a habit. This is a sample paragraph demonstrating the body text styling with proper line height and max-width constraints for optimal readability.</p>
+            </div>
+          </section>
+
+          <!-- Spacing Scale -->
+          <section class="demo-section">
+            <h2 class="demo-section__title">Spacing Scale</h2>
+            <div class="spacing-scale">
+              <div class="spacing-block" style="height: 8px;" title="8px"></div>
+              <div class="spacing-block" style="height: 16px;" title="16px"></div>
+              <div class="spacing-block" style="height: 24px;" title="24px"></div>
+              <div class="spacing-block" style="height: 40px;" title="40px"></div>
+              <div class="spacing-block" style="height: 64px;" title="64px"></div>
+            </div>
+            <p class="text-small text-muted mt-sm">8px, 16px, 24px, 40px, 64px — Never use random spacing values</p>
+          </section>
+
+          <!-- Buttons -->
+          <section class="demo-section">
+            <h2 class="demo-section__title">Buttons</h2>
+            <div class="button-showcase">
+              <button class="btn btn--primary">Primary Button</button>
+              <button class="btn btn--secondary">Secondary Button</button>
+              <button class="btn btn--ghost">Ghost Button</button>
+              <button class="btn btn--primary btn--small">Small Primary</button>
+              <button class="btn btn--secondary btn--small">Small Secondary</button>
+            </div>
+          </section>
+
+          <!-- Form Elements -->
+          <section class="demo-section">
+            <h2 class="demo-section__title">Form Elements</h2>
+            <div class="preview-card">
+              <div class="mb-sm">
+                <label class="label">Text Input</label>
+                <input type="text" class="input" placeholder="Enter your name...">
+              </div>
+              <div class="mb-sm">
+                <label class="label">Textarea</label>
+                <textarea class="input textarea" placeholder="Describe your project..."></textarea>
+              </div>
+              <div>
+                <label class="label">Input with Error</label>
+                <input type="text" class="input input--error" value="Invalid input">
+              </div>
+            </div>
+          </section>
+
+          <!-- Cards -->
+          <section class="demo-section">
+            <h2 class="demo-section__title">Cards</h2>
+            <div class="card">
+              <div class="card__header">
+                <span class="card__title">Project Card</span>
+                <span class="badge badge--success">Complete</span>
+              </div>
+              <p>This is a standard card component with a header and content area. Clean borders, no shadows, balanced padding.</p>
+            </div>
+            <div class="card">
+              <div class="card__header">
+                <span class="card__title">Another Card</span>
+                <span class="badge badge--warning">Pending</span>
+              </div>
+              <p>Cards maintain consistency across the application with a subtle border and white background.</p>
+            </div>
+          </section>
+
+          <!-- States -->
+          <section class="demo-section">
+            <h2 class="demo-section__title">States</h2>
+            <div class="preview-card mb-sm">
+              <div class="empty-state">
+                <div class="empty-state__icon">○</div>
+                <h3 class="empty-state__title">No projects yet</h3>
+                <p class="empty-state__text">Create your first project to get started building.</p>
+                <button class="btn btn--primary">Create Project</button>
+              </div>
+            </div>
+            <div class="error-state">
+              <div class="error-state__title">Unable to connect</div>
+              <p class="error-state__text">There was a problem connecting to the server. Please check your internet connection and try again.</p>
+              <div class="error-state__action">
+                <button class="btn btn--secondary btn--small">Retry Connection</button>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- SECONDARY PANEL -->
+        <aside class="main-layout__secondary">
+          <div class="step-explanation">
+            <div class="step-explanation__title">Step 2 of 5</div>
+            <p class="step-explanation__text">Review the design system components and ensure they align with your product requirements.</p>
+          </div>
+
+          <div class="prompt-box">
+            <div class="prompt-box__label">Generated Prompt</div>
+            <div class="prompt-box__content">Create a premium SaaS dashboard with the following features: sidebar navigation, main content area, and data visualization components.</div>
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn btn--secondary">
+              <span>Copy</span>
+            </button>
+            <button class="btn btn--primary">
+              <span>Build in Lovable</span>
+            </button>
+            <button class="btn btn--secondary">
+              <span>It Worked</span>
+            </button>
+            <button class="btn btn--secondary">
+              <span>Error</span>
+            </button>
+            <button class="btn btn--ghost">
+              <span>Add Screenshot</span>
+            </button>
+          </div>
+
+          <div class="divider mt-md"></div>
+
+          <div class="step-explanation">
+            <div class="step-explanation__title">Design Principles</div>
+            <p class="step-explanation__text" style="font-size: 14px; line-height: 1.7;">
+              • Calm: No flashy animations or unnecessary visual noise<br>
+              • Intentional: Every element serves a purpose<br>
+              • Coherent: Consistent patterns across all pages<br>
+              • Confident: Clear hierarchy and confident typography
+            </p>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- PROOF FOOTER -->
+  <footer class="proof-footer">
+    <div class="proof-footer__inner">
+      <div class="proof-footer__title">Proof Checklist</div>
+      <div class="proof-footer__checklist">
+        <div class="proof-item">
+          <input type="checkbox" class="proof-item__checkbox" id="proof1">
+          <label class="proof-item__label" for="proof1">UI Built</label>
+          <input type="text" class="proof-item__input" placeholder="Screenshot or link...">
+        </div>
+        <div class="proof-item">
+          <input type="checkbox" class="proof-item__checkbox" id="proof2">
+          <label class="proof-item__label" for="proof2">Logic Working</label>
+          <input type="text" class="proof-item__input" placeholder="Test results...">
+        </div>
+        <div class="proof-item">
+          <input type="checkbox" class="proof-item__checkbox" id="proof3">
+          <label class="proof-item__label" for="proof3">Test Passed</label>
+          <input type="text" class="proof-item__input" placeholder="Test output...">
+        </div>
+        <div class="proof-item">
+          <input type="checkbox" class="proof-item__checkbox" id="proof4">
+          <label class="proof-item__label" for="proof4">Deployed</label>
+          <input type="text" class="proof-item__input" placeholder="Live URL...">
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
